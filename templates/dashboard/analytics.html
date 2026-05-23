@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Analytics Dashboard - AI Code Reviewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="fw-bold mb-1">
+                {% if is_staff %}System Analytics Dashboard{% else %}Personal Analytics Dashboard{% endif %}
+            </h1>
+            <p class="text-muted mb-0">Monitor AI review frequency, average scores, and performance latency stats.</p>
+        </div>
+        <div>
+            <a href="{% url 'export_csv' %}" class="btn btn-secondary-premium">
+                <i class="fa-solid fa-file-csv me-2"></i>Export CSV
+            </a>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        {% if is_staff %}
+        <div class="glass-card stat-card">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total
+                Users</div>
+            <div class="stat-val">{{ total_users }}</div>
+        </div>
+        {% endif %}
+        <div class="glass-card stat-card">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total
+                Reviews</div>
+            <div class="stat-val">{{ total_reviews }}</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Favorite
+                Language</div>
+            <div class="stat-val" style="background: none; -webkit-text-fill-color: initial; color: #7c3aed;">{{ most_used_lang }}</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Avg
+                Latency</div>
+            <div class="stat-val">{{ latency_avg }}ms</div>
+        </div>
+        <div class="glass-card stat-card">
+            <div class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Success
+                Rate</div>
+            <div class="stat-val" style="background: none; -webkit-text-fill-color: initial; color: #10b981;">{{ success_rate }}%</div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="glass-card h-100">
+                <h4 class="fw-bold mb-4"><i class="fa-solid fa-star text-primary me-2"></i>Review Averages</h4>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">Security Score</span>
+                        <span class="fw-bold text-danger">{{ avg_security }}/10</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.06); border-radius:3px;">
+                        <div class="progress-bar bg-danger" style="width: {% widthratio avg_security 1 10 %}%"></div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">Performance Score</span>
+                        <span class="fw-bold text-primary">{{ avg_performance }}/10</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.06); border-radius:3px;">
+                        <div class="progress-bar bg-primary" style="width: {% widthratio avg_performance 1 10 %}%">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">Readability Score</span>
+                        <span class="fw-bold text-success">{{ avg_readability }}/10</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.06); border-radius:3px;">
+                        <div class="progress-bar bg-success" style="width: {% widthratio avg_readability 1 10 %}%">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">Overall Average Score</span>
+                        <span class="fw-bold" style="color: #7c3aed;">{{ avg_overall }}/10</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.06); border-radius:3px;">
+                        <div class="progress-bar"
+                            style="width: {% widthratio avg_overall 1 10 %}%; background: #7c3aed;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="glass-card h-100">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-chart-line text-primary me-2"></i>Review Trends</h4>
+                <div style="position: relative; height: 210px; width: 100%;">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-3">
+            <div class="glass-card h-100">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-chart-pie text-primary me-2"></i>Languages</h4>
+                <div style="position: relative; height: 210px; width: 100%;">
+                    {% if lang_counts %}
+                    <canvas id="languagesChart"></canvas>
+                    {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100 text-muted small">
+                        No review statistics yet.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if is_staff %}
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="glass-card">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-users-gear text-primary me-2"></i>Manage Profiles</h4>
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table align-middle m-0 border-0" style="color:inherit;">
+                        <thead>
+                            <tr class="text-muted small" style="border-bottom: 1px solid var(--card-border);">
+                                <th>Username</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in user_list %}
+                            <tr style="border-bottom: 1px solid var(--card-border);">
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="user-avatar" style="width:32px; height:32px; font-size: 0.8rem;">{{ u.username|slice:":1"|upper }}</div>
+                                        <div>
+                                            <span class="d-block fw-semibold" style="font-size:0.88rem;">{{ u.username }}</span>
+                                            <small class="text-muted" style="font-size:0.72rem;">{{ u.email }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if u.profile.is_blocked %}
+                                    <span class="badge bg-danger-subtle text-danger">Blocked</span>
+                                    {% else %}
+                                    <span class="badge bg-success-subtle text-success">Active</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form action="{% url 'toggle_user_block' u.id %}" method="POST" class="d-inline">
+                                        {% csrf_token %}
+                                        {% if u.profile.is_blocked %}
+                                        <button type="submit" class="btn btn-sm btn-premium py-1"
+                                            style="font-size:0.78rem;">
+                                            Reactivate
+                                        </button>
+                                        {% else %}
+                                        <button type="submit" class="btn btn-sm btn-danger-premium py-1"
+                                            style="font-size:0.78rem;">
+                                            Suspend
+                                        </button>
+                                        {% endif %}
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4 small">No other system users.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="glass-card">
+                <h4 class="fw-bold mb-3"><i class="fa-solid fa-list-check text-primary me-2"></i>API Request History
+                    Audit</h4>
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table align-middle m-0 border-0" style="color:inherit;">
+                        <thead>
+                            <tr class="text-muted small" style="border-bottom: 1px solid var(--card-border);">
+                                <th>User</th>
+                                <th>Lang</th>
+                                <th>Latency</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr style="font-size:0.85rem; border-bottom: 1px solid var(--card-border);">
+                                <td class="fw-semibold">{{ log.user.username|default:"Anonymous" }}</td>
+                                <td><span class="text-primary fw-bold">{{ log.language|upper }}</span></td>
+                                <td>{{ log.latency_ms }}ms</td>
+                                <td>
+                                    {% if log.status == 'SUCCESS' %}
+                                    <span class="badge bg-success-subtle text-success">200 OK</span>
+                                    {% else %}
+                                    <span class="badge bg-danger-subtle text-danger">FAIL</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted text-truncate" style="max-width: 140px;"
+                                    title="{{ log.error_message }}">
+                                    {{ log.error_message|default:"Success" }}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4 small">No audit logs recorded yet.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const isLight = document.body.classList.contains('light-theme');
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.04)';
+    const labelColor = isLight ? '#4b5563' : '#9ca3af';
+
+    const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+    new Chart(trendsCtx, {
+        type: 'line',
+        data: {
+            labels: {{ day_labels| safe }},
+        datasets: [{
+            label: 'Code Reviews',
+            data: {{ day_counts| safe }},
+        borderColor: '#7c3aed',
+        backgroundColor: isLight ? 'rgba(124, 58, 237, 0.05)' : 'rgba(124, 58, 237, 0.1)',
+        tension: 0.35,
+        fill: true,
+        borderWidth: 2.5,
+        pointBackgroundColor: '#4f46e5'
+            }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: gridColor }, ticks: { color: labelColor, font: { family: 'Poppins', size: 10 } } },
+            y: { grid: { color: gridColor }, ticks: { color: labelColor, stepSize: 1, font: { family: 'Poppins', size: 10 } }, beginAtZero: true }
+        }
+    }
+    });
+
+    {% if lang_counts %}
+    const langCtx = document.getElementById('languagesChart').getContext('2d');
+    new Chart(langCtx, {
+        type: 'doughnut',
+        data: {
+            labels: {{ lang_labels| safe }},
+        datasets: [{
+            data: {{ lang_counts| safe }},
+        backgroundColor: ['#7c3aed', '#ec4899', '#10b981', '#3b82f6', '#f59e0b', '#6b7280', '#06b6d4', '#f43f5e'],
+        borderWidth: 0
+            }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { color: labelColor, font: { family: 'Poppins', size: 10 } } }
+        }
+    }
+    });
+    {% endif %}
+</script>
+{% endblock %}

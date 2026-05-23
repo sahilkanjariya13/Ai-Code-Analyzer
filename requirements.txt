@@ -1,0 +1,8 @@
+django>=5.0
+google-generativeai
+python-dotenv
+django-crispy-forms
+crispy-bootstrap5
+pillow
+xhtml2pdf
+markdown

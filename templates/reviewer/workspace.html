@@ -1,0 +1,621 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Workspace - AI Code Reviewer{% endblock %}
+
+{% block extra_head %}
+<style>
+    .score-badge {
+        font-size: 2.25rem;
+        font-weight: 800;
+        display: block;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .score-title {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        display: block;
+        text-align: center;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .score-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .score-item {
+        padding: 0.75rem 0.5rem;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-md);
+    }
+
+    body.light-theme .score-item {
+        background: rgba(0, 0, 0, 0.01);
+    }
+
+    .nav-tabs-premium {
+        border-bottom: 1px solid var(--card-border) !important;
+        gap: 0.5rem;
+    }
+
+    .nav-tabs-premium .nav-link {
+        color: var(--text-muted);
+        border: none !important;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        background: transparent !important;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .nav-tabs-premium .nav-link:hover {
+        color: var(--text-main) !important;
+    }
+
+    .nav-tabs-premium .nav-link.active {
+        color: var(--text-main) !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+    }
+
+    body.light-theme .nav-tabs-premium .nav-link.active {
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .nav-tabs-premium .nav-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary-grad);
+        border-radius: 3px 3px 0 0;
+    }
+
+    /* Semantic coloring parameters */
+    .score-security {
+        color: #f43f5e;
+    }
+
+    .score-performance {
+        color: #3b82f6;
+    }
+
+    .score-readability {
+        color: #10b981;
+    }
+
+    .score-overall {
+        color: #a78bfa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="mb-1 fw-bold">Code Review Workspace</h1>
+            <p class="text-muted mb-0">Write or paste your code and request an elite review using Gemini AI.</p>
+        </div>
+        <div>
+            <a href="{% url 'review_history' %}" class="btn btn-secondary-premium">
+                <i class="fa-solid fa-history me-2"></i>History
+            </a>
+        </div>
+    </div>
+
+    <form id="review-form" method="POST" novalidate>
+        {% csrf_token %}
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="glass-card h-100 position-relative d-flex flex-column" style="min-height: 500px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="m-0 fw-bold"><i class="fa-solid fa-terminal text-primary me-2"></i>Source Code</h4>
+                        <div style="width: 180px;">
+                            {{ form.language }}
+                        </div>
+                    </div>
+
+                    <div class="d-none">
+                        {{ form.code }}
+                    </div>
+
+                    <div id="monaco-editor" class="editor-container flex-grow-1"></div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button type="button" id="clear-editor-btn" class="btn btn-secondary-premium">
+                            <i class="fa-solid fa-trash me-2"></i>Clear
+                        </button>
+                        <button type="submit" id="submit-review-btn" class="btn btn-premium">
+                            <i class="fa-solid fa-robot me-2"></i>Review Code
+                        </button>
+                    </div>
+
+                    <div id="editor-loading" class="loading-overlay">
+                        <div class="spinner-glow mb-3"></div>
+                        <h5 class="fw-bold mb-2">Analyzing Codebase...</h5>
+                        <p class="text-muted text-center px-4" style="max-width: 320px; font-size: 0.85rem;">
+                            Gemini is checking for vulnerabilities, bugs, clean code violations, and optimizations.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="glass-card h-100 position-relative d-flex flex-column" style="min-height: 500px;">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2"
+                        style="border-color: var(--card-border) !important;">
+                        <ul class="nav nav-tabs nav-tabs-premium border-0" id="result-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="report-tab" data-bs-toggle="tab"
+                                    data-bs-target="#tab-report" type="button" role="tab" aria-controls="tab-report"
+                                    aria-selected="true">
+                                    <i class="fa-solid fa-square-poll-horizontal me-2"></i>Report
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="corrected-tab" data-bs-toggle="tab"
+                                    data-bs-target="#tab-corrected" type="button" role="tab"
+                                    aria-controls="tab-corrected" aria-selected="false">
+                                    <i class="fa-solid fa-code me-2"></i>Corrected Code
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="chat-tab" data-bs-toggle="tab"
+                                    data-bs-target="#tab-chat" type="button" role="tab"
+                                    aria-controls="tab-chat" aria-selected="false">
+                                    <i class="fa-solid fa-comments me-2"></i>Follow-Up Chat
+                                </button>
+                            </li>
+                        </ul>
+                        <div id="report-actions" class="d-none">
+                            <button type="button" id="copy-report-btn" class="btn btn-secondary-premium btn-sm me-2"
+                                title="Copy Report to Clipboard">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                            <a href="#" id="pdf-report-btn" class="btn btn-premium btn-sm" title="Download Report PDF">
+                                <i class="fa-solid fa-file-pdf me-1"></i> PDF
+                            </a>
+                        </div>
+                    </div>
+
+                    <div id="report-empty"
+                        class="d-flex flex-column align-items-center justify-content-center flex-grow-1 text-center py-5">
+                        <i class="fa-solid fa-shield-halved text-muted mb-3" style="font-size: 4rem; opacity: 0.3;"></i>
+                        <h5 class="fw-bold">Waiting for submission</h5>
+                        <p class="text-muted" style="max-width: 280px; font-size: 0.85rem;">
+                            Submit code in the editor to populate report metrics and vulnerability highlights.
+                        </p>
+                    </div>
+
+                    <div id="report-content" class="d-none flex-grow-1 d-flex flex-column">
+                        <div class="tab-content flex-grow-1 d-flex flex-column" id="result-tabs-content">
+                            <div class="tab-pane fade show active flex-grow-1 d-flex flex-column" id="tab-report"
+                                role="tabpanel" aria-labelledby="report-tab">
+                                <div class="score-container">
+                                    <div class="score-item text-center">
+                                        <span class="score-title">Security</span>
+                                        <span id="sec-score-val" class="score-badge score-security">0</span>
+                                    </div>
+                                    <div class="score-item text-center">
+                                        <span class="score-title">Performance</span>
+                                        <span id="perf-score-val" class="score-badge score-performance">0</span>
+                                    </div>
+                                    <div class="score-item text-center">
+                                        <span class="score-title">Readability</span>
+                                        <span id="read-score-val" class="score-badge score-readability">0</span>
+                                    </div>
+                                    <div class="score-item text-center">
+                                        <span class="score-title">Overall</span>
+                                        <span id="over-score-val" class="score-badge score-overall">0</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex-grow-1 overflow-auto pe-2" style="max-height: 380px;">
+                                    <div id="markdown-container" class="markdown-body"></div>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade flex-grow-1 d-flex flex-column" id="tab-corrected" role="tabpanel"
+                                aria-labelledby="corrected-tab">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <span class="text-muted small"><i
+                                            class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i>AI-corrected
+                                        version of your code.</span>
+                                    <div class="corrected-actions">
+                                        <button type="button" id="copy-corrected-btn"
+                                            class="btn btn-secondary-premium btn-sm me-2" title="Copy Corrected Code">
+                                            <i class="fa-solid fa-copy me-1"></i>Copy
+                                        </button>
+                                        <button type="button" id="apply-corrected-btn" class="btn btn-premium btn-sm"
+                                            title="Apply Code to Main Editor">
+                                            <i class="fa-solid fa-square-check me-1"></i>Apply
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="corrected-monaco-editor" class="editor-container flex-grow-1"></div>
+                            </div>
+
+                            <div class="tab-pane fade flex-grow-1 d-flex flex-column" id="tab-chat" role="tabpanel"
+                                aria-labelledby="chat-tab">
+                                <div class="chat-layout">
+                                    <div id="chat-history" class="chat-history-box">
+                                        <div class="chat-bubble chat-bubble-ai">
+                                            <p>Hi! I've analyzed your code. Click the "Report" tab to see scores, security issues, and clean code suggestions. Ask me anything here about the review or optimizations!</p>
+                                        </div>
+                                    </div>
+                                    <div class="chat-input-area">
+                                        <textarea id="chat-input-text" class="chat-input-box" placeholder="Ask a follow-up question about this review..."></textarea>
+                                        <button type="button" id="chat-send-btn" class="chat-send-btn" title="Send Message">
+                                            <i class="fa-solid fa-paper-plane"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="typing-loader" class="loading-overlay">
+                        <h5 class="fw-bold mb-3">Compiling AI Insights...</h5>
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script>
+    require.config({
+        paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }
+    });
+
+    let editor;
+    let correctedEditor;
+    let currentReviewId = null;
+
+    const defaultCodes = {
+        'python': 'def calculate_sum(numbers):\n    # TODO: Optimize this code\n    total = 0\n    for n in numbers:\n        total = total + n\n    return total\n\nprint(calculate_sum([1, 2, 3, 4, 5]))',
+        'javascript': 'function calculateSum(numbers) {\n    let total = 0;\n    for(let i = 0; i < numbers.length; i++) {\n        total += numbers[i];\n    }\n    return total;\n}\n\nconsole.log(calculateSum([1, 2, 3, 4, 5]));',
+        'java': 'public class Main {\n    public static int calculateSum(int[] numbers) {\n        int total = 0;\n        for (int n : numbers) {\n            total += n;\n        }\n        return total;\n    }\n}',
+        'cpp': '#include <iostream>\n#include <vector>\n\nint calculateSum(const std::vector<int>& numbers) {\n    int total = 0;\n    for(int n : numbers) {\n        total += n;\n    }\n    return total;\n}',
+        'html': '<!DOCTYPE html>\n<html>\n<head>\n    <title>Sample Site</title>\n</head>\n<body>\n    <h1>Hello World</h1>\n</body>\n</html>'
+    };
+
+    require(['vs/editor/editor.main'], function () {
+        const langSelect = document.getElementById('id_language');
+        if (langSelect) {
+            langSelect.classList.add('form-select', 'btn-secondary-premium', 'text-start');
+        }
+        let selectedLang = langSelect ? langSelect.value : 'python';
+
+        function mapMonacoLanguage(lang) {
+            const mappings = { 'django': 'html', 'csharp': 'csharp', 'cpp': 'cpp', 'go': 'go', 'rust': 'rust' };
+            return mappings[lang] || lang;
+        }
+
+        const currentTheme = 'vs';
+
+        function createEditors() {
+            editor = monaco.editor.create(document.getElementById('monaco-editor'), {
+                value: defaultCodes[selectedLang] || '# Paste code here',
+                language: mapMonacoLanguage(selectedLang),
+                theme: currentTheme,
+                automaticLayout: true,
+                fontSize: 14,
+                fontFamily: '"Fira Code", Consolas, "Courier New", monospace',
+                minimap: { enabled: false },
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 12, bottom: 12 }
+            });
+
+            correctedEditor = monaco.editor.create(document.getElementById('corrected-monaco-editor'), {
+                value: '',
+                language: mapMonacoLanguage(selectedLang),
+                theme: currentTheme,
+                readOnly: true,
+                automaticLayout: true,
+                fontSize: 14,
+                fontFamily: '"Fira Code", Consolas, "Courier New", monospace',
+                minimap: { enabled: false },
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 12, bottom: 12 }
+            });
+
+            setupEditorLogic();
+        }
+
+        if (document.fonts) {
+            document.fonts.ready.then(createEditors);
+        } else {
+            createEditors();
+        }
+
+        function setupEditorLogic() {
+            const appliedCode = localStorage.getItem('apply_corrected_code');
+            const appliedLang = localStorage.getItem('apply_corrected_lang');
+            if (appliedCode && langSelect) {
+                if (appliedLang) {
+                    langSelect.value = appliedLang;
+                    selectedLang = appliedLang;
+                    const mapped = mapMonacoLanguage(selectedLang);
+                    monaco.editor.setModelLanguage(editor.getModel(), mapped);
+                    monaco.editor.setModelLanguage(correctedEditor.getModel(), mapped);
+                }
+                editor.setValue(appliedCode);
+                localStorage.removeItem('apply_corrected_code');
+                localStorage.removeItem('apply_corrected_lang');
+            }
+
+
+            if (langSelect) {
+                langSelect.addEventListener('change', function () {
+                    const newLang = this.value;
+                    const mapped = mapMonacoLanguage(newLang);
+                    monaco.editor.setModelLanguage(editor.getModel(), mapped);
+                    monaco.editor.setModelLanguage(correctedEditor.getModel(), mapped);
+
+                    const currentVal = editor.getValue();
+                    const wasDefault = Object.values(defaultCodes).includes(currentVal) || currentVal.trim() === '# Paste code here';
+                    if (wasDefault && defaultCodes[newLang]) {
+                        editor.setValue(defaultCodes[newLang]);
+                    }
+                });
+            }
+
+            document.getElementById('clear-editor-btn').addEventListener('click', function () {
+                editor.setValue('');
+            });
+
+            const correctedTabEl = document.getElementById('corrected-tab');
+            if (correctedTabEl) {
+                correctedTabEl.addEventListener('shown.bs.tab', function () {
+                    if (correctedEditor) correctedEditor.layout();
+                });
+            }
+        }
+
+        // Processing Submit Elements
+        const form = document.getElementById('review-form');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const codeVal = editor.getValue();
+            if (!codeVal.trim()) {
+                alert("Please write or paste some code before submitting!");
+                return;
+            }
+
+            // Fallback locator block logic loops structural items correctly
+            let txtArea = document.getElementById('id_code') || document.getElementsByName('code')[0];
+            if (txtArea) {
+                txtArea.value = codeVal;
+            }
+
+            document.getElementById('editor-loading').classList.add('active');
+            document.getElementById('typing-loader').classList.add('active');
+
+            document.getElementById('report-empty').classList.add('d-none');
+            document.getElementById('report-content').classList.add('d-none');
+            document.getElementById('report-actions').classList.add('d-none');
+
+            const formData = new FormData(form);
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            fetch(window.location.pathname, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('editor-loading').classList.remove('active');
+                    document.getElementById('typing-loader').classList.remove('active');
+
+                    if (data.success) {
+                        document.getElementById('sec-score-val').innerText = data.scores.security;
+                        document.getElementById('perf-score-val').innerText = data.scores.performance;
+                        document.getElementById('read-score-val').innerText = data.scores.readability;
+                        document.getElementById('over-score-val').innerText = data.scores.overall;
+
+                        document.getElementById('markdown-container').innerHTML = data.html_content;
+
+                        if (correctedEditor) {
+                            correctedEditor.setValue(data.improved_code || '// No separate improvements suggested.');
+                        }
+
+                        currentReviewId = data.review_id;
+
+                        // Reset chat history to greeting bubble for the new submission
+                        const chatHistoryBox = document.getElementById('chat-history');
+                        if (chatHistoryBox) {
+                            chatHistoryBox.innerHTML = `
+                                <div class="chat-bubble chat-bubble-ai">
+                                    <p>Hi! I've analyzed your code. Click the "Report" tab to see scores, security issues, and clean code suggestions. Ask me anything here about the review or optimizations!</p>
+                                </div>
+                            `;
+                        }
+
+                        document.getElementById('report-content').classList.remove('d-none');
+                        document.getElementById('report-actions').classList.remove('d-none');
+                        document.getElementById('pdf-report-btn').href = `/pdf/${data.review_id}/`;
+                        window.rawMarkdown = data.html_content;
+                    } else {
+                        document.getElementById('report-empty').classList.remove('d-none');
+                        alert("Error during code review: " + data.error);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('editor-loading').classList.remove('active');
+                    document.getElementById('typing-loader').classList.remove('active');
+                    document.getElementById('report-empty').classList.remove('d-none');
+                    console.error("AJAX Error: ", error);
+                    alert("An unexpected error occurred.");
+                });
+        });
+
+        document.getElementById('copy-report-btn').addEventListener('click', function () {
+            const mdElement = document.getElementById('markdown-container');
+            const range = document.createRange();
+            range.selectNode(mdElement);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            try {
+                document.execCommand('copy');
+                alert('Code review report copied to clipboard successfully!');
+            } catch (e) {
+                alert('Could not copy report automatically.');
+            }
+            window.getSelection().removeAllRanges();
+        });
+
+        document.getElementById('copy-corrected-btn').addEventListener('click', function () {
+            const codeVal = correctedEditor.getValue();
+            if (!codeVal.trim()) return;
+            navigator.clipboard.writeText(codeVal).then(function () {
+                alert('Corrected code copied to clipboard successfully!');
+            });
+        });
+
+        document.getElementById('apply-corrected-btn').addEventListener('click', function () {
+            const codeVal = correctedEditor.getValue();
+            if (!codeVal.trim() || codeVal === '// No separate improvements suggested.') return;
+            if (confirm("Are you sure you want to replace your workspace content with the corrected version?")) {
+                editor.setValue(codeVal);
+            }
+        });
+
+        // Chat Action & Event Handlers
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        const chatInputText = document.getElementById('chat-input-text');
+        const chatHistory = document.getElementById('chat-history');
+
+        function appendUserMessage(text) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble chat-bubble-user';
+            bubble.innerHTML = `<p>${escapeHtml(text)}</p><span class="chat-time">${timeStr}</span>`;
+            chatHistory.appendChild(bubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function appendAiMessage(htmlContent) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble chat-bubble-ai';
+            bubble.innerHTML = `${htmlContent}<span class="chat-time">${timeStr}</span>`;
+            chatHistory.appendChild(bubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function appendAiLoading() {
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble chat-bubble-ai chat-bubble-loading';
+            bubble.id = 'chat-loading-bubble';
+            bubble.innerHTML = `
+                <div class="typing-indicator" style="gap: 4px;">
+                    <span style="width:6px; height:6px;"></span>
+                    <span style="width:6px; height:6px;"></span>
+                    <span style="width:6px; height:6px;"></span>
+                </div>
+            `;
+            chatHistory.appendChild(bubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return bubble;
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function sendChatMessage() {
+            const msg = chatInputText.value.trim();
+            if (!msg || !currentReviewId) return;
+
+            chatInputText.value = '';
+            appendUserMessage(msg);
+
+            const loadingBubble = appendAiLoading();
+            chatSendBtn.disabled = true;
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const formData = new FormData();
+            formData.append('message', msg);
+
+            fetch(`/detail/${currentReviewId}/chat/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const activeLoading = document.getElementById('chat-loading-bubble');
+                if (activeLoading) activeLoading.remove();
+                chatSendBtn.disabled = false;
+                if (data.success) {
+                    appendAiMessage(data.message);
+                } else {
+                    alert("Error from AI: " + data.error);
+                }
+            })
+            .catch(err => {
+                const activeLoading = document.getElementById('chat-loading-bubble');
+                if (activeLoading) activeLoading.remove();
+                chatSendBtn.disabled = false;
+                console.error("Chat Error:", err);
+                alert("An error occurred while sending the message.");
+            });
+        }
+
+        if (chatSendBtn && chatInputText) {
+            chatSendBtn.addEventListener('click', sendChatMessage);
+            chatInputText.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        }
+
+        const chatTabEl = document.getElementById('chat-tab');
+        if (chatTabEl) {
+            chatTabEl.addEventListener('shown.bs.tab', function () {
+                if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
+            });
+        }
+    });
+</script>
+{% endblock %}

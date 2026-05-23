@@ -1,0 +1,454 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Review #{{ review.id }} Details - AI Code Reviewer{% endblock %}
+
+{% block extra_head %}
+<style>
+    .score-badge-large {
+        font-size: 2.5rem;
+        font-weight: 800;
+        display: block;
+        line-height: 1.1;
+    }
+
+    .score-label-large {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 6px;
+        display: block;
+        font-weight: 600;
+    }
+
+    .score-box {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-md);
+        padding: 1rem 0.5rem;
+        text-align: center;
+    }
+
+    .nav-tabs-premium {
+        border-bottom: 1px solid var(--card-border) !important;
+        gap: 0.5rem;
+    }
+
+    .nav-tabs-premium .nav-link {
+        color: var(--text-muted);
+        border: none !important;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        background: transparent !important;
+        padding: 0.6rem 1.2rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+    .nav-tabs-premium .nav-link:hover {
+        color: var(--text-main) !important;
+    }
+
+    .nav-tabs-premium .nav-link.active {
+        color: var(--text-main) !important;
+        background: rgba(255, 255, 255, 0.03) !important;
+    }
+
+    body.light-theme .nav-tabs-premium .nav-link.active {
+        background: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .nav-tabs-premium .nav-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary-grad);
+        border-radius: 3px 3px 0 0;
+    }
+
+    .score-security {
+        color: #f43f5e;
+    }
+
+    .score-performance {
+        color: #3b82f6;
+    }
+
+    .score-readability {
+        color: #10b981;
+    }
+
+    .score-overall {
+        color: #7c3aed;
+    }
+
+    body.light-theme .score-overall {
+        color: #6d28d9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <a href="{% url 'review_history' %}" class="btn btn-secondary-premium btn-sm mb-2">
+                <i class="fa-solid fa-arrow-left me-2"></i>Back to History
+            </a>
+            <h1 class="mb-0 fw-bold">Code Review Report Details</h1>
+            <p class="text-muted">Review submitted by {{ review.user.username }} on {{ review.created_at|date:"Y-m-d H:i" }}</p>
+        </div>
+        <div>
+            <a href="{% url 'download_pdf' review.id %}" class="btn btn-premium">
+                <i class="fa-solid fa-file-pdf me-2"></i>Download PDF Report
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="glass-card h-100 d-flex flex-column" style="min-height: 450px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="fw-bold m-0"><i class="fa-solid fa-code text-primary me-2"></i>Submitted Code</h4>
+                    <span class="badge btn-secondary-premium m-0 px-3 py-2" style="font-size:0.8rem;">
+                        {{ review.get_language_display }}
+                    </span>
+                </div>
+
+                <div class="flex-grow-1 overflow-auto rounded-3 p-3 border"
+                    style="background: rgba(0,0,0,0.2); border-color: var(--card-border) !important; max-height: 350px;">
+                    <pre class="m-0"
+                        style="font-family: var(--font-code); font-size: 0.88rem; color: inherit; line-height: 1.6;"><code>{{ review.code }}</code></pre>
+                </div>
+
+                <div class="mt-3">
+                    <button type="button" id="copy-code-btn" class="btn btn-secondary-premium w-100">
+                        <i class="fa-solid fa-copy me-2"></i>Copy Code
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="glass-card h-100 d-flex flex-column" style="min-height: 450px;">
+                <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2"
+                    style="border-color: var(--card-border) !important;">
+                    <ul class="nav nav-tabs nav-tabs-premium border-0" id="result-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="report-tab" data-bs-toggle="tab"
+                                data-bs-target="#tab-report" type="button" role="tab" aria-controls="tab-report"
+                                aria-selected="true">
+                                <i class="fa-solid fa-square-poll-horizontal me-2"></i>Report
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="corrected-tab" data-bs-toggle="tab"
+                                data-bs-target="#tab-corrected" type="button" role="tab" aria-controls="tab-corrected"
+                                aria-selected="false">
+                                <i class="fa-solid fa-code me-2"></i>Corrected Code
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="chat-tab" data-bs-toggle="tab"
+                                data-bs-target="#tab-chat" type="button" role="tab" aria-controls="tab-chat"
+                                aria-selected="false">
+                                <i class="fa-solid fa-comments me-2"></i>Follow-Up Chat
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="tab-content flex-grow-1 d-flex flex-column" id="result-tabs-content">
+                    <div class="tab-pane fade show active flex-grow-1 d-flex flex-column" id="tab-report"
+                        role="tabpanel" aria-labelledby="report-tab">
+                        <div class="row g-2 mb-4">
+                            <div class="col-3">
+                                <div class="score-box">
+                                    <span class="score-badge-large score-security">{{ review.score_security }}</span>
+                                    <span class="score-label-large">Security</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="score-box">
+                                    <span class="score-badge-large score-performance">{{ review.score_performance }}</span>
+                                    <span class="score-label-large">Performance</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="score-box">
+                                    <span class="score-badge-large score-readability">{{ review.score_readability }}</span>
+                                    <span class="score-label-large">Readability</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="score-box"
+                                    style="background: rgba(124, 58, 237, 0.04); border-color: rgba(124, 58, 237, 0.25);">
+                                    <span class="score-badge-large score-overall">{{ review.score_overall }}</span>
+                                    <span class="score-label-large" style="color: var(--text-main);">Overall</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 class="fw-bold mb-3"><i
+                                class="fa-solid fa-square-poll-horizontal text-primary me-2"></i>Review Report</h4>
+
+                        <div class="flex-grow-1 overflow-auto pe-2" style="max-height: 340px;">
+                            <div class="markdown-body">
+                                {{ review_html|safe }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade flex-grow-1 d-flex flex-column" id="tab-corrected" role="tabpanel"
+                        aria-labelledby="corrected-tab">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <span class="text-muted small"><i
+                                    class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i>AI-corrected version
+                                of the code.</span>
+                            <div class="corrected-actions">
+                                <button type="button" id="copy-corrected-btn"
+                                    class="btn btn-secondary-premium btn-sm me-2" title="Copy Corrected Code">
+                                    <i class="fa-solid fa-copy me-1"></i>Copy
+                                </button>
+                                <button type="button" id="apply-corrected-btn" class="btn btn-premium btn-sm"
+                                    title="Apply Code to Workspace Editor">
+                                    <i class="fa-solid fa-square-check me-1"></i>Apply to Editor
+                                </button>
+                            </div>
+                        </div>
+                        <div id="corrected-monaco-editor" class="editor-container flex-grow-1"></div>
+                    </div>
+
+                    <div class="tab-pane fade flex-grow-1 d-flex flex-column" id="tab-chat" role="tabpanel"
+                        aria-labelledby="chat-tab">
+                        <div class="chat-layout">
+                            <div id="chat-history" class="chat-history-box">
+                                <div class="chat-bubble chat-bubble-ai">
+                                    <p>Hi! I've analyzed your code. Click the "Report" tab to see scores, security issues, and clean code suggestions. Ask me anything here about the review or optimizations!</p>
+                                </div>
+                                {% for msg in chat_messages %}
+                                    {% if msg.role == 'user' %}
+                                        <div class="chat-bubble chat-bubble-user">
+                                            {{ msg.content_html|safe }}
+                                            <span class="chat-time">{{ msg.created_at|date:"H:i" }}</span>
+                                        </div>
+                                    {% else %}
+                                        <div class="chat-bubble chat-bubble-ai">
+                                            {{ msg.content_html|safe }}
+                                            <span class="chat-time">{{ msg.created_at|date:"H:i" }}</span>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <div class="chat-input-area">
+                                <textarea id="chat-input-text" class="chat-input-box" placeholder="Ask a follow-up question about this review..."></textarea>
+                                <button type="button" id="chat-send-btn" class="chat-send-btn" title="Send Message">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+<script>
+    require.config({
+        paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }
+    });
+
+    let correctedEditor;
+
+    function mapMonacoLanguage(lang) {
+        const mappings = { 'django': 'html', 'csharp': 'csharp', 'cpp': 'cpp', 'go': 'go', 'rust': 'rust' };
+        return mappings[lang] || lang;
+    }
+
+    require(['vs/editor/editor.main'], function () {
+        const selectedLang = '{{ review.language|escapejs }}';
+        const currentTheme = 'vs';
+
+        function createEditor() {
+            correctedEditor = monaco.editor.create(document.getElementById('corrected-monaco-editor'), {
+                value: `{{ review.improved_code|escapejs }}` || '// No separate improvements suggested.',
+                language: mapMonacoLanguage(selectedLang),
+                theme: currentTheme,
+                readOnly: true,
+                automaticLayout: true,
+                fontSize: 14,
+                fontFamily: '"Fira Code", Consolas, "Courier New", monospace',
+                minimap: { enabled: false },
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                padding: { top: 12, bottom: 12 }
+            });
+
+            setupEditorLogic();
+        }
+
+        if (document.fonts) {
+            document.fonts.ready.then(createEditor);
+        } else {
+            createEditor();
+        }
+
+        function setupEditorLogic() {
+
+
+            const correctedTabEl = document.getElementById('corrected-tab');
+            if (correctedTabEl) {
+                correctedTabEl.addEventListener('shown.bs.tab', function () {
+                    if (correctedEditor) correctedEditor.layout();
+                });
+            }
+
+            document.getElementById('copy-corrected-btn').addEventListener('click', function () {
+                const codeVal = correctedEditor.getValue();
+                if (!codeVal.trim()) return;
+                navigator.clipboard.writeText(codeVal).then(function () {
+                    alert('Corrected code copied to clipboard successfully!');
+                });
+            });
+
+            document.getElementById('apply-corrected-btn').addEventListener('click', function () {
+                const codeVal = correctedEditor.getValue();
+                if (!codeVal.trim() || codeVal === '// No separate improvements suggested.') return;
+                if (confirm("Would you like to load this corrected version into your Code Review Workspace?")) {
+                    localStorage.setItem('apply_corrected_code', codeVal);
+                    localStorage.setItem('apply_corrected_lang', '{{ review.language|escapejs }}');
+                    window.location.href = "{% url 'review' %}";
+                }
+            });
+
+            // Chat Action & Event Handlers
+            const chatSendBtn = document.getElementById('chat-send-btn');
+            const chatInputText = document.getElementById('chat-input-text');
+            const chatHistory = document.getElementById('chat-history');
+
+            // Scroll chat history to bottom on load
+            if (chatHistory) {
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            function appendUserMessage(text) {
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble chat-bubble-user';
+                bubble.innerHTML = `<p>${escapeHtml(text)}</p><span class="chat-time">${timeStr}</span>`;
+                chatHistory.appendChild(bubble);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            function appendAiMessage(htmlContent) {
+                const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble chat-bubble-ai';
+                bubble.innerHTML = `${htmlContent}<span class="chat-time">${timeStr}</span>`;
+                chatHistory.appendChild(bubble);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            function appendAiLoading() {
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble chat-bubble-ai chat-bubble-loading';
+                bubble.id = 'chat-loading-bubble';
+                bubble.innerHTML = `
+                    <div class="typing-indicator" style="gap: 4px;">
+                        <span style="width:6px; height:6px;"></span>
+                        <span style="width:6px; height:6px;"></span>
+                        <span style="width:6px; height:6px;"></span>
+                    </div>
+                `;
+                chatHistory.appendChild(bubble);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                return bubble;
+            }
+
+            function escapeHtml(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function sendChatMessage() {
+                const msg = chatInputText.value.trim();
+                if (!msg) return;
+
+                chatInputText.value = '';
+                appendUserMessage(msg);
+
+                const loadingBubble = appendAiLoading();
+                chatSendBtn.disabled = true;
+
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                const formData = new FormData();
+                formData.append('message', msg);
+
+                fetch(`/detail/{{ review.id }}/chat/`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const activeLoading = document.getElementById('chat-loading-bubble');
+                    if (activeLoading) activeLoading.remove();
+                    chatSendBtn.disabled = false;
+                    if (data.success) {
+                        appendAiMessage(data.message);
+                    } else {
+                        alert("Error from AI: " + data.error);
+                    }
+                })
+                .catch(err => {
+                    const activeLoading = document.getElementById('chat-loading-bubble');
+                    if (activeLoading) activeLoading.remove();
+                    chatSendBtn.disabled = false;
+                    console.error("Chat Error:", err);
+                    alert("An error occurred while sending the message.");
+                });
+            }
+
+            if (chatSendBtn && chatInputText) {
+                chatSendBtn.addEventListener('click', sendChatMessage);
+                chatInputText.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendChatMessage();
+                    }
+                });
+            }
+
+            const chatTabEl = document.getElementById('chat-tab');
+            if (chatTabEl) {
+                chatTabEl.addEventListener('shown.bs.tab', function () {
+                    if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
+                });
+            }
+        }
+    });
+
+    document.getElementById('copy-code-btn').addEventListener('click', function () {
+        const codeText = `{{ review.code|escapejs }}`;
+        navigator.clipboard.writeText(codeText).then(function () {
+            alert('Source code copied to clipboard successfully!');
+        });
+    });
+</script>
+{% endblock %}

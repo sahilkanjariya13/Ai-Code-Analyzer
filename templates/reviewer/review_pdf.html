@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Code Review Report #{{ review.id }}</title>
+    <style>
+        /* PDF specific styling configuration for xhtml2pdf compatibility */
+        @page {
+            size: a4 portrait;
+            margin: 2cm;
+            margin-bottom: 2.5cm;
+            @frame footer {
+                -pdf-frame-content: footer_content;
+                bottom: 1.5cm;
+                left: 2cm;
+                right: 2cm;
+                height: 1cm;
+            }
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #2d3748;
+            line-height: 1.6;
+            font-size: 10pt;
+        }
+        h1 {
+            font-size: 22pt;
+            color: #4f46e5;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        h2 {
+            font-size: 14pt;
+            color: #1a202c;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 4px;
+            font-weight: bold;
+        }
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .meta-table td {
+            padding: 10px 14px;
+            border: 1px solid #edf2f7;
+            font-size: 9.5pt;
+        }
+        .meta-table td.label {
+            font-weight: bold;
+            background-color: #f7fafc;
+            color: #4a5568;
+            width: 25%;
+        }
+        .score-val {
+            font-size: 11pt;
+            font-weight: bold;
+        }
+        pre {
+            background-color: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 14px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 8.5pt;
+            margin-bottom: 25px;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f7fafc;
+            padding: 2px 4px;
+            font-size: 9pt;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Code Review Report</h1>
+    
+    <table class="meta-table">
+        <tr>
+            <td class="label">Report Reference</td>
+            <td>Review #{{ review.id }}</td>
+            <td class="label">Date Created</td>
+            <td>{{ created_at_formatted }}</td>
+        </tr>
+        <tr>
+            <td class="label">Submitter</td>
+            <td>{{ review.user.username }}</td>
+            <td class="label">Language</td>
+            <td>{{ review.get_language_display }}</td>
+        </tr>
+        <tr>
+            <td class="label">Security Score</td>
+            <td class="score-val" style="color: #e53e3e;">{{ review.score_security }}/10</td>
+            <td class="label">Performance Score</td>
+            <td class="score-val" style="color: #3182ce;">{{ review.score_performance }}/10</td>
+        </tr>
+        <tr>
+            <td class="label">Readability Score</td>
+            <td class="score-val" style="color: #38a169;">{{ review.score_readability }}/10</td>
+            <td class="label">Overall Score</td>
+            <td class="score-val" style="color: #805ad5;">{{ review.score_overall }}/10</td>
+        </tr>
+    </table>
+
+    <h2>Submitted Source Code</h2>
+    <pre>{{ review.code }}</pre>
+
+    <h2>AI Code Review Insights</h2>
+    <div>
+        {{ review_html|safe }}
+    </div>
+
+    <div id="footer_content" style="text-align: right; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 8pt; color: #718096;">
+        Page <pdf:pagenumber /> of <pdf:pagecount />
+    </div>
+</body>
+</html>

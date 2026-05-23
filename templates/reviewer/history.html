@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Review History - AI Code Reviewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="mb-1 fw-bold">Code Review History</h1>
+            <p class="text-muted mb-0">Browse and search through all past AI code review runs.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'export_csv' %}" class="btn btn-secondary-premium">
+                <i class="fa-solid fa-file-csv me-2"></i>Export CSV
+            </a>
+            <a href="{% url 'review' %}" class="btn btn-premium">
+                <i class="fa-solid fa-plus me-2"></i>New Review
+            </a>
+        </div>
+    </div>
+
+    <div class="glass-card mb-4">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label for="search" class="form-label text-muted small fw-bold text-uppercase" style="letter-spacing:0.05em;">Search Content</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-end-0" style="border-color:var(--card-border); color:var(--text-muted);">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" name="search" id="search" value="{{ search_query }}" class="form-control bg-transparent border-start-0 ps-0" style="border-color:var(--card-border); color:var(--text-main);" placeholder="Find keywords in code...">
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="language" class="form-label text-muted small fw-bold text-uppercase" style="letter-spacing:0.05em;">Programming Language</label>
+                <select name="language" id="language" class="form-select bg-transparent text-start" style="border-color:var(--card-border); color:var(--text-main); background-color: var(--glass-bg) !important;">
+                    <option value="" style="color:#000;">All Languages</option>
+                    {% for val, name in languages %}
+                        <option value="{{ val }}" {% if selected_language == val %}selected{% endif %} style="color:#000;">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-premium w-100 py-2">
+                    <i class="fa-solid fa-filter me-2"></i>Filter
+                </button>
+                <a href="{% url 'review_history' %}" class="btn btn-secondary-premium w-100 py-2 text-center d-flex align-items-center justify-content-center" style="text-decoration:none;">
+                    Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="glass-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle m-0 border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: rgba(0,0,0,0.01); color: inherit;">
+                <thead>
+                    <tr class="text-muted" style="font-size:0.85rem; border-bottom:1px solid var(--card-border); font-weight:600;">
+                        <th class="ps-3">ID</th>
+                        <th>Language</th>
+                        <th>Code Snippet</th>
+                        <th class="text-center">Scores (S / P / R)</th>
+                        <th class="text-center">Overall</th>
+                        <th>Created At</th>
+                        <th class="text-end pe-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reviews %}
+                        <tr style="border-bottom:1px solid var(--card-border);">
+                            <td class="ps-3 fw-bold">#{{ r.id }}</td>
+                            <td>
+                                <span class="badge btn-secondary-premium m-0 px-2.5 py-1.5" style="font-size:0.75rem;">
+                                    {{ r.get_language_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <code class="text-truncate d-inline-block text-muted" style="max-width: 260px; font-family: var(--font-code); font-size:0.8rem;">
+                                    {{ r.code|truncatechars:40 }}
+                                </code>
+                            </td>
+                            <td class="text-center">
+                                <span class="text-danger fw-bold">{{ r.score_security }}</span> <small class="text-muted">/</small>
+                                <span class="text-primary fw-bold">{{ r.score_performance }}</span> <small class="text-muted">/</small>
+                                <span class="text-success fw-bold">{{ r.score_readability }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge" style="background: rgba(109, 40, 217, 0.1); border: 1px solid rgba(109, 40, 217, 0.2); color: #6d28d9; font-weight:700; font-size:0.85rem; padding: 0.4rem 0.6rem;">
+                                    {{ r.score_overall }}/10
+                                </span>
+                            </td>
+                            <td class="text-muted" style="font-size:0.85rem;">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+                            <td class="text-end pe-3">
+                                <a href="{% url 'review_detail' r.id %}" class="btn btn-sm btn-secondary-premium px-2.5 py-1.5 me-1" title="View Detailed Report">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <a href="{% url 'download_pdf' r.id %}" class="btn btn-sm btn-premium px-2.5 py-1.5 me-1" title="Download Report PDF">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                </a>
+                                <form action="{% url 'delete_review' r.id %}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this code review record?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger-premium px-2.5 py-1.5" title="Delete Review">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-5">
+                                <i class="fa-solid fa-folder-open mb-3" style="font-size:3.5rem; opacity: 0.3;"></i>
+                                <h5 class="fw-bold text-white">No Review Records Found</h5>
+                                <p class="mb-0 text-muted" style="font-size:0.85rem;">Submit new code reviews in the workspace to fill this log.</p>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+            <nav class="d-flex justify-content-center mt-4">
+                <ul class="pagination pagination-premium m-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_language %}&language={{ selected_language }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">&laquo;</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                            <a class="page-link" href="?page={{ num }}{% if selected_language %}&language={{ selected_language }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
+                        </li>
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_language %}&language={{ selected_language }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">&raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            <style>
+                .pagination-premium .page-link {
+                    background: rgba(255,255,255,0.03);
+                    border-color: var(--card-border);
+                    color: var(--text-muted);
+                    padding: 0.5rem 0.9rem;
+                    font-weight: 500;
+                    transition: all 0.2s ease;
+                }
+                body.light-theme .pagination-premium .page-link {
+                    background: #fff;
+                }
+                .pagination-premium .page-link:hover {
+                    background: rgba(124,58,237,0.08);
+                    color: var(--text-main);
+                }
+                .pagination-premium .page-item.active .page-link {
+                    background: var(--primary-grad);
+                    border-color: transparent;
+                    color: #fff !important;
+                    box-shadow: 0 4px 10px var(--accent-glow);
+                }
+            </style>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

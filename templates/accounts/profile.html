@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}User Profile - AI Code Reviewer{% endblock %}
+
+{% block extra_head %}
+<style>
+    .metric-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        display: block;
+        line-height: 1.2;
+    }
+    .metric-title {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        margin-top: 2px;
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="glass-card text-center py-5">
+                <div class="user-avatar mx-auto mb-3" style="width: 85px; height: 85px; font-size: 2.25rem; border: 3px solid var(--glass-border);">
+                    {{ user.username|slice:":1"|upper }}
+                </div>
+                <h3 class="fw-bold mb-1">{{ user.username }}</h3>
+                <p class="text-muted mb-4" style="font-size:0.9rem;">{{ user.email }}</p>
+                
+                <hr style="border-color: var(--card-border); margin: 1.5rem 0;">
+
+                <div class="row g-2 text-start px-2">
+                    <div class="col-6">
+                        <small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.68rem; letter-spacing:0.05em;">Role</small>
+                        <span class="fw-semibold" style="font-size:0.9rem;">
+                            {% if user.is_staff %}<span class="badge bg-primary">Admin</span>{% else %}Standard User{% endif %}
+                        </span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block text-uppercase fw-bold" style="font-size:0.68rem; letter-spacing:0.05em;">Joined</small>
+                        <span class="fw-semibold" style="font-size:0.88rem;">{{ user.date_joined|date:"Y-m-d" }}</span>
+                    </div>
+                </div>
+                
+                {% if user.profile.is_blocked %}
+                    <div class="alert btn-danger-premium mt-4 mb-0 mx-2 text-center" style="font-size:0.85rem;">
+                        <i class="fa-solid fa-circle-exclamation me-1"></i> Account is suspended.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="glass-card mb-4">
+                <h4 class="fw-bold mb-4"><i class="fa-solid fa-ranking-star text-primary me-2"></i>My Performance Averages</h4>
+                <div class="row g-3">
+                    <div class="col-sm-3 col-6">
+                        <div class="p-3 rounded border text-center" style="background: rgba(255,255,255,0.01); border-color: var(--card-border) !important;">
+                            <span class="metric-value text-danger">{{ avg_security }}</span>
+                            <span class="metric-title">Security</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 col-6">
+                        <div class="p-3 rounded border text-center" style="background: rgba(255,255,255,0.01); border-color: var(--card-border) !important;">
+                            <span class="metric-value text-primary">{{ avg_performance }}</span>
+                            <span class="metric-title">Performance</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 col-6">
+                        <div class="p-3 rounded border text-center" style="background: rgba(255,255,255,0.01); border-color: var(--card-border) !important;">
+                            <span class="metric-value text-success">{{ avg_readability }}</span>
+                            <span class="metric-title">Readability</span>
+                        </div>
+                    </div>
+                    <div class="col-sm-3 col-6">
+                        <div class="p-3 rounded border text-center" style="border-color: rgba(124, 58, 237, 0.2) !important; background: rgba(124, 58, 237, 0.04) !important;">
+                            <span class="metric-value" style="color: #6d28d9;">{{ avg_overall }}</span>
+                            <span class="metric-title" style="color: var(--text-muted);">Overall</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="fw-bold m-0"><i class="fa-solid fa-code-commit text-primary me-2"></i>My Recent Reviews</h4>
+                    <span class="text-muted small">Total submissions: **{{ reviews_count }}**</span>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table align-middle m-0 border-0" style="color:inherit;">
+                        <thead>
+                            <tr class="text-muted small" style="border-bottom:1px solid var(--card-border); font-weight:600;">
+                                <th>Lang</th>
+                                <th>Code Snippet</th>
+                                <th class="text-center">Score</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in recent_reviews %}
+                                <tr style="border-bottom:1px solid var(--card-border);">
+                                    <td>
+                                        <span class="badge btn-secondary-premium m-0 px-2.5 py-1.5" style="font-size:0.72rem;">
+                                            {{ r.get_language_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <code class="text-muted text-truncate d-inline-block" style="max-width: 200px; font-family: var(--font-code); font-size:0.78rem;">
+                                            {{ r.code|truncatechars:35 }}
+                                        </code>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge" style="background: rgba(109,40,217,0.1); color:#6d28d9; font-weight:600;">{{ r.score_overall }}/10</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="{% url 'review_detail' r.id %}" class="btn btn-sm btn-secondary-premium px-2.5 py-1.5 me-1" title="View details">
+                                            <i class="fa-solid fa-eye" style="font-size:0.8rem;"></i>
+                                        </a>
+                                        <a href="{% url 'download_pdf' r.id %}" class="btn btn-sm btn-premium px-2.5 py-1.5 me-1" title="Download PDF">
+                                            <i class="fa-solid fa-file-pdf" style="font-size:0.8rem;"></i>
+                                        </a>
+                                        <form action="{% url 'delete_review' r.id %}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this code review record?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-danger-premium px-2.5 py-1.5" title="Delete Review">
+                                                <i class="fa-solid fa-trash" style="font-size:0.8rem;"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4 small">No reviews submitted yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

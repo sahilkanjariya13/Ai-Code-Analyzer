@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Sign Up - AI Code Reviewer{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-center" style="min-height: 75vh;">
+    <div class="glass-card" style="width: 100%; max-width: 420px; padding: 2.5rem;">
+        <div class="text-center mb-4">
+            <div class="brand justify-content-center m-0 mb-2">
+                <i class="fa-solid fa-brain-circuit"></i>
+                <span>Antigravity Reviewer</span>
+            </div>
+            <h5 class="fw-bold">Create your account</h5>
+            <p class="text-muted" style="font-size: 0.85rem;">Get started with instant code audits.</p>
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+            
+            {{ form|crispy }}
+            
+            <button type="submit" class="btn btn-premium w-100 mt-3 py-2">
+                Register <i class="fa-solid fa-user-plus ms-2"></i>
+            </button>
+        </form>
+
+        <div class="text-center mt-4">
+            <p class="text-muted mb-0" style="font-size: 0.85rem;">
+                Already have an account? <a href="{% url 'login' %}" style="color: #6d28d9; text-decoration: none; font-weight: 600;">Sign In</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Styling to make django forms beautiful in our light theme */
+    label {
+        color: var(--text-muted) !important;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.35rem;
+    }
+    .form-control {
+        background-color: #ffffff !important;
+        border: 1px solid var(--card-border) !important;
+        color: var(--text-main) !important;
+        border-radius: 10px !important;
+        padding: 0.6rem 1rem !important;
+    }
+    .form-control:focus {
+        background-color: #ffffff !important;
+        border-color: #6d28d9 !important;
+        box-shadow: 0 0 0 0.25rem rgba(109, 40, 217, 0.15) !important;
+    }
+    .invalid-feedback {
+        color: #f43f5e !important;
+    }
+    .helptext {
+        display: block;
+        color: var(--text-muted) !important;
+        font-size: 0.75rem !important;
+        margin-top: 0.25rem;
+    }
+</style>
+{% endblock %}
